@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""模块3 的验收测试。
+"""Acceptance tests for Module 3.
 
-第 1–5 条对应 module2 的 integration_contract.md 的 "Smoke test to request
-from Module 3"；第 6–8 条是模块3 自己的资金守恒与可复现性检查。
+Items 1-5 mirror the "Smoke test to request from Module 3" section of
+module2's integration_contract.md; the remaining tests cover Module 3's own conservation and reproducibility checks.
 
-运行：python3 -m unittest discover -s module3/tests -v
+Run: python3 -m unittest discover -s module3/tests -v
 """
 
 import csv
@@ -24,7 +24,7 @@ from m3engine import DatasetError, load_dataset, run_dataset, write_outputs  # n
 
 MODULE2 = ROOT / "module2_ref" / "FTEC5510-mBridge-Module2-Copy-main"
 FIXED_DEMO_SOURCE = MODULE2 / "examples" / "fixed_demo"
-# 优先用仓库内置样例，这样 clone 下来不依赖 module2 仓库也能跑
+# prefer the built-in fixture so a fresh clone runs without the module2 repo
 FIXTURE = ROOT / "module3" / "fixtures" / "fixed_demo"
 FIXED_DEMO = FIXTURE if FIXTURE.exists() else FIXED_DEMO_SOURCE
 PILOT_SEED_1001 = MODULE2 / "outputs" / "pilot" / "baseline" / "seed_1001"
@@ -35,7 +35,7 @@ EXOGENOUS = {"PAYMENT_ARRIVAL", "INFLOW_NOTICE", "INFLOW_ARRIVAL"}
 
 def _require(path: Path) -> None:
     if not path.exists():
-        raise unittest.SkipTest(f"缺少 Module 2 数据: {path}")
+        raise unittest.SkipTest(f"Module 2 data not found: {path}")
 
 
 def _read_csv(path: Path) -> list[dict]:
@@ -60,7 +60,7 @@ def _fx_total(result) -> Decimal:
 
 
 class FixedDemoContractTests(unittest.TestCase):
-    """integration_contract.md 第 1–4 条。"""
+    """Items 1-4 of integration_contract.md."""
 
     @classmethod
     def setUpClass(cls):
@@ -101,7 +101,7 @@ class FixedDemoContractTests(unittest.TestCase):
                     continue
                 self.assertGreaterEqual(
                     int(row["submit_time"]), int(row["arrival_time"]),
-                    f"{strategy}: {row['payment_id']} 在到达前就被提交")
+                    f"{strategy}: {row['payment_id']} was submitted before it arrived")
                 if row["settle_time"] != "":
                     self.assertGreaterEqual(int(row["settle_time"]),
                                             int(row["arrival_time"]))
@@ -115,7 +115,7 @@ class FixedDemoContractTests(unittest.TestCase):
         first_big_credit = next((time for time, delta in jumps
                                  if delta >= Decimal("300000")), None)
         self.assertEqual(first_big_credit, 450,
-                         "I000001 在 210 秒通知，但人民币必须到 450 秒才可用")
+                         "I000001 is announced at 210 s, but the cash must not be usable before 450 s")
 
     def test_4_balance_invariants_hold(self):
         for strategy in STRATEGIES:
@@ -125,13 +125,13 @@ class FixedDemoContractTests(unittest.TestCase):
                         + _fx_total(result)
                         - _settled_total(result))
             actual = Decimal(result.summary["rmb_total_end"])
-            self.assertEqual(actual, expected, f"{strategy}: 人民币余额不守恒")
+            self.assertEqual(actual, expected, f"{strategy}: RMB balance is not conserved")
 
             for row in result.balances:
                 for key in ("rmb_available", "hkd_available", "rmb_locked",
                             "hkd_committed", "rmb_total", "hkd_total"):
                     self.assertGreaterEqual(Decimal(row[key]), Decimal("0"),
-                                            f"{strategy}: {key} 出现负数")
+                                            f"{strategy}: {key} went negative")
             self.assertEqual(Decimal(result.summary["rmb_locked_end"]), Decimal("0"))
 
     def test_5_all_strategies_share_inputs_and_have_distinct_run_ids(self):
@@ -147,7 +147,7 @@ class FixedDemoContractTests(unittest.TestCase):
 
 
 class AccountingTests(unittest.TestCase):
-    """在真实的 pilot 数据上做守恒与可复现性检查。"""
+    """Conservation and reproducibility checks on the real pilot dataset."""
 
     @classmethod
     def setUpClass(cls):
@@ -162,13 +162,13 @@ class AccountingTests(unittest.TestCase):
                         + _fx_total(result)
                         - _settled_total(result))
             actual = Decimal(result.summary["rmb_total_end"])
-            self.assertEqual(actual, expected, f"{strategy}: 余额不守恒")
+            self.assertEqual(actual, expected, f"{strategy}: balance is not conserved")
 
     def test_no_payment_settled_twice(self):
         result = run_dataset(self.dataset, "S1")
         settled = [row["payment_id"] for row in result.events
                    if row["event_type"] == "PAYMENT_SETTLED"]
-        self.assertEqual(len(settled), len(set(settled)), "同一笔付款被结算了两次")
+        self.assertEqual(len(settled), len(set(settled)), "a payment was settled twice")
 
     def test_hkd_conservation(self):
         result = run_dataset(self.dataset, "S1")
@@ -188,14 +188,14 @@ class AccountingTests(unittest.TestCase):
 
 class ManifestAndOutputTests(unittest.TestCase):
     def test_fixture_is_byte_identical_to_module2_source(self):
-        """仓库内置样例必须和 module2 原件逐字节一致，防止悄悄漂移。"""
+        """The built-in fixture must stay byte-identical to the module 2 original."""
         if not FIXED_DEMO_SOURCE.exists():
-            raise unittest.SkipTest("本机没有 module2 仓库，跳过比对")
+            raise unittest.SkipTest("no module 2 repo on this machine; skipping the comparison")
         for name in ("config.json", "payments.csv", "inflows.csv",
                      "expected_exogenous_events.csv", "manifest.json"):
             self.assertEqual((FIXTURE / name).read_bytes(),
                              (FIXED_DEMO_SOURCE / name).read_bytes(),
-                             f"{name} 与 module2 原件不一致")
+                             f"{name} differs from the module 2 original")
 
     def test_manifest_tampering_is_detected(self):
         _require(FIXED_DEMO)
@@ -226,7 +226,7 @@ class ManifestAndOutputTests(unittest.TestCase):
                               "hkd_committed", "hkd_available"])
             rows = _read_csv(Path(tmp) / "payment_results.csv")
             self.assertTrue(all(row["run_id"] == "fixed_demo_v1_S1" for row in rows))
-            # 未提交/未结算的时间字段必须留空，不能填 0
+            # timestamps that did not happen must be blank, never 0
             for row in rows:
                 if row["final_status"] == "QUEUED":
                     self.assertEqual(row["submit_time"], "")

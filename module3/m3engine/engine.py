@@ -1,14 +1,14 @@
-"""模块3：离散事件仿真引擎、资金状态机、S0/S1 策略。
+"""Module 3: discrete-event simulation engine, cash state machine, S0/S1 strategies.
 
-对外入口（与 integration_contract.md 一致）：
+Public entry points (consistent with integration_contract.md):
 
     run_simulation(payments, inflows, config, strategy_id)
         -> (payment_results, event_log, balances)
 
-    run_dataset(dataset, strategy_id) -> RunResult（含 fx_trades 与 summary）
+    run_dataset(dataset, strategy_id) -> RunResult (including fx_trades and summary)
 
-同一时刻事件的固定处理顺序见 EVENT_ORDER；该顺序属于模块3 的解释权，
-需要模块1/6 确认后写进 interface_spec.md。
+The fixed same-second event order is EVENT_ORDER. That ordering is Module 3's interpretation
+and must be confirmed by Module 1/6 and recorded in interface_spec.md.
 """
 
 from __future__ import annotations
@@ -24,23 +24,23 @@ from . import adapters
 from .models import (INELIGIBLE, NOT_ARRIVED, PENDING, QUEUED, SETTLED,
                      ZERO, fmt, money)
 
-# 同一秒内的事件处理顺序（数值小的先处理）
+# Same-second event order (lower number is processed first)
 EVENT_ORDER = {
-    "PAYMENT_ARRIVAL": 0,       # 新指令到达
-    "INFLOW_NOTICE": 1,         # 收到入账通知（不增加余额）
-    "INFLOW_ARRIVAL": 2,        # 入账真正到账
-    "FX_COMPLETION": 3,         # 换汇完成，人民币到账
-    "PAYMENT_CONFIRMATION": 4,  # 付款确认结果
-    "FUNDING_REVIEW": 5,        # 定期重评估
+    "PAYMENT_ARRIVAL": 0,       # a new instruction arrives
+    "INFLOW_NOTICE": 1,         # inflow announced (no cash yet)
+    "INFLOW_ARRIVAL": 2,        # inflow actually credited
+    "FX_COMPLETION": 3,         # FX completes, RMB credited
+    "PAYMENT_CONFIRMATION": 4,  # payment confirmation result
+    "FUNDING_REVIEW": 5,        # periodic re-review
 }
 
-# 引擎自有参数。Module 2 的 config 里没有这些字段，交由模块3 负责并需全组确认。
+# Engine-owned parameters. Module 2's config has no such fields: Module 3 owns them and the team must confirm.
 ENGINE_DEFAULTS = {
-    "payment_confirmation_delay_sec": 10,   # proposal 4.1.4 基线值
-    "payment_confirmation_fail_prob": 0.0,  # 基线不做确认失败
-    "observation_drain_sec": 0,             # 观察终点 = simulation_window_sec + drain
-    "fx_buffer_rmb": 0.0,                   # TopUp = 缺口 + buffer
-    # per_trade: 每次换汇不超过 capacity；cumulative: 全程累计额度
+    "payment_confirmation_delay_sec": 10,   # baseline value from proposal 4.1.4
+    "payment_confirmation_fail_prob": 0.0,  # no confirmation failures in the baseline
+    "observation_drain_sec": 0,             # observation endpoint = simulation_window_sec + drain
+    "fx_buffer_rmb": 0.0,                   # TopUp = gap + buffer
+    # per_trade: each trade <= capacity; cumulative: total quota for the run
     "fx_counterparty_capacity_mode": "per_trade",
 }
 
@@ -95,7 +95,7 @@ class Simulation:
                  decide_fn: Callable | None = None,
                  using_fallback: tuple[bool, bool] | None = None):
         if strategy_id not in ("S0", "S1", "S2", "S3", "S4"):
-            raise ValueError(f"未知策略 {strategy_id!r}，应为 S0–S4")
+            raise ValueError(f"unknown strategy {strategy_id!r}; expected S0-S4")
 
         self.config = config
         self.strategy = strategy_id
@@ -103,8 +103,8 @@ class Simulation:
         self.run_id = f"{self.dataset_id}_{strategy_id}"
         self.params = resolve_engine_params(config)
 
-        # S0/S1 完全由模块3 自己实现，不依赖模块4/5；
-        # S2/S4 需要 rank_payments，S3/S4 需要 decide_funding。
+        # S0/S1 are implemented entirely inside Module 3 and do not depend on Module 4/5;
+        # S2/S4 need rank_payments, S3/S4 need decide_funding.
         fallback_flags = [False, False]
         if rank_fn is None:
             if strategy_id in ("S2", "S4"):
@@ -133,7 +133,7 @@ class Simulation:
         spread = Decimal(str(config.get("fx_spread_bps", 0))) / Decimal("10000")
         self.effective_rate = self.fx_rate * (Decimal("1") - spread)
         if self.effective_rate <= 0:
-            raise ValueError("fx_rate 与 fx_spread_bps 组合使有效汇率非正")
+            raise ValueError("fx_rate combined with fx_spread_bps makes the effective rate non-positive")
         self.fx_fee_hkd = money(config.get("fx_fee_fixed_hkd", 0))
         self.fx_delay = int(config["fx_execution_delay_sec"])
         self.fx_min = money(config["fx_topup_min_rmb"])
@@ -151,7 +151,7 @@ class Simulation:
             cpty_remaining=self.fx_capacity,
         )
 
-        # 同 seed 在不同策略之间产生相同的确认结果，保证配对比较成立
+        # the same seed gives identical confirmation outcomes across strategies, so paired comparison holds
         self.rng = random.Random(int(config.get("seed", 0)))
 
         self.now = 0
@@ -168,7 +168,7 @@ class Simulation:
         self._decision_state: dict[str, tuple] = {}
 
     # ------------------------------------------------------------------
-    # 事件调度
+    # Event scheduling
     # ------------------------------------------------------------------
     def _schedule(self, when: int, kind: str, payload=None) -> None:
         self.seq += 1
@@ -192,7 +192,7 @@ class Simulation:
             when += interval
 
     # ------------------------------------------------------------------
-    # 日志与快照
+    # Logging and snapshots
     # ------------------------------------------------------------------
     def _log(self, event_type: str, payment_id: str = "", fx_id: str = "",
              action: str = "", reason: str = "") -> int:
@@ -219,7 +219,7 @@ class Simulation:
         })
 
     def _log_decision(self, payment, action: str, reason: str) -> None:
-        """相同（付款，动作，理由）只记一次，避免每个 review tick 刷重复日志。"""
+        """Log once per (payment, action, reason) so review ticks do not flood the event log."""
         signature = (action, reason)
         if self._decision_state.get(payment.payment_id) == signature:
             return
@@ -228,7 +228,7 @@ class Simulation:
                   action=action, reason=reason)
 
     # ------------------------------------------------------------------
-    # 状态视图（交给模块4/5，只给已观察信息）
+    # State views handed to Module 4/5 (observed information only)
     # ------------------------------------------------------------------
     def _payment_view(self, payment) -> dict:
         return {
@@ -262,9 +262,9 @@ class Simulation:
         return [self._payment_view(p) for p in queued]
 
     def _known_inflows(self) -> list[dict]:
-        """只返回已通知、尚未到账、且在预测窗口内的入账。
+        """Return only announced, not-yet-credited inflows inside the prediction window.
 
-        Module 5 拿到的是这个过滤后的列表，永远不是完整的 inflows.csv。
+        Module 5 receives this filtered list, never the complete inflows.csv.
         """
         prediction = self.config.get("prediction_parameters", {})
         lookahead = int(prediction.get("max_lookahead_sec", 10 ** 9))
@@ -289,7 +289,7 @@ class Simulation:
         return result
 
     # ------------------------------------------------------------------
-    # 主循环
+    # Main loop
     # ------------------------------------------------------------------
     def run(self) -> RunResult:
         self._schedule_exogenous()
@@ -321,14 +321,14 @@ class Simulation:
             self._on_fx_completion(payload)
         elif kind == "PAYMENT_CONFIRMATION":
             self._on_payment_confirmation(payload)
-        # FUNDING_REVIEW 本身不需要动作，下面统一重评估
+        # FUNDING_REVIEW itself needs no action; the shared re-review below covers it
         self._review()
 
     def _on_payment_arrival(self, payment_id: str) -> None:
         payment = self.by_id[payment_id]
         if payment.status == INELIGIBLE:
             self._log("PAYMENT_ARRIVAL", payment_id=payment_id, action="SKIP",
-                      reason="eligible=false，引擎不提交也不占用资金")
+                      reason="eligible=false; engine neither submits nor reserves funds")
             return
         payment.status = QUEUED
         self._log("PAYMENT_ARRIVAL", payment_id=payment_id)
@@ -371,7 +371,7 @@ class Simulation:
             payment.submit_time = None
             payment.retry_count += 1
             self._log("PAYMENT_CONFIRM_FAILED", payment_id=payment_id, action="RELEASE",
-                      reason="确认失败，锁定资金释放并重新排队")
+                      reason="confirmation failed; locked funds released and payment re-queued")
             return
         self.state.rmb_total -= payment.amount_rmb
         payment.status = SETTLED
@@ -379,7 +379,7 @@ class Simulation:
         self._log("PAYMENT_SETTLED", payment_id=payment_id)
 
     # ------------------------------------------------------------------
-    # 队列处理与资金决策
+    # Queue processing and funding decisions
     # ------------------------------------------------------------------
     def _ordered_queue(self) -> list:
         queued = [p for p in self.payments if p.status == QUEUED]
@@ -392,7 +392,7 @@ class Simulation:
             known = {p.payment_id for p in queued}
             ordered = [self.by_id[pid] for pid in order
                        if pid in known and self.by_id[pid].status == QUEUED]
-            # 模块4 漏掉的指令补在末尾，避免引擎丢单
+            # append instructions Module 4 omitted so the engine never drops a payment
             missing = [p for p in queued if p not in ordered]
             missing.sort(key=lambda p: (p.arrival_time, p.payment_id))
             return ordered + missing
@@ -416,7 +416,7 @@ class Simulation:
                     if blocked is None:
                         blocked = payment
                     if not skippable:
-                        break  # S0 只看队首
+                        break  # S0 only inspects the queue head
             if submitted:
                 continue
             if blocked is None:
@@ -526,7 +526,7 @@ class Simulation:
         return True
 
     # ------------------------------------------------------------------
-    # 收尾与输出
+    # Finalisation and output
     # ------------------------------------------------------------------
     def _finalise(self) -> None:
         for payment in self.payments:
@@ -617,7 +617,7 @@ class Simulation:
 
 
 # ----------------------------------------------------------------------
-# 对外入口
+# Public entry points
 # ----------------------------------------------------------------------
 
 def run_dataset(dataset, strategy_id: str, **kwargs) -> RunResult:
@@ -627,7 +627,7 @@ def run_dataset(dataset, strategy_id: str, **kwargs) -> RunResult:
 
 
 def run_simulation(payments, inflows, config: dict, strategy_id: str, **kwargs):
-    """契约签名：返回 (payment_results, event_log, balances)。"""
+    """Contract signature: returns (payment_results, event_log, balances)."""
     simulation = Simulation(payments, inflows, config, strategy_id, **kwargs)
     result = simulation.run()
     return result.payments, result.events, result.balances

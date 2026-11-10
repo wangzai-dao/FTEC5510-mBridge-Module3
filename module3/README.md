@@ -1,142 +1,159 @@
-# 模块3 — 仿真引擎与基础策略（S0/S1）
+# Module 3 — Simulation Engine and Baseline Strategies (S0/S1)
 
-FTEC5510 Group 12 · mBridge HKD/RMB 流动性感知结算
+FTEC5510 Advanced Financial Infrastructure · Group 12 · mBridge HKD/RMB
+liquidity-aware settlement
 
-本目录按 **Module 2 已交付的数据契约**（`integration_contract.md` v1.0.0 /
-`data_dictionary.md`）实现模块3：读取 dataset、跑离散事件仿真、维护资金状态机、
-输出三张规定的结果表。只依赖 Python 标准库。
+This module implements the discrete-event engine on top of the **data contract
+already delivered by Module 2** (`integration_contract.md` v1.0.0 /
+`data_dictionary.md`): it loads a dataset, runs the simulation, maintains the
+cash state machine, and writes the three mandated result tables. Python standard
+library only — no third-party dependencies.
 
 ---
 
-## 1. 快速开始
+## 1. Quick start
 
-仓库**自带固定样例** `fixtures/fixed_demo/`（10 笔付款 / 3 笔入账），clone 下来直接能跑：
+The repository ships a **hand-checkable fixture** in `fixtures/fixed_demo/`
+(10 payments, 3 inflows), so a fresh clone runs immediately:
 
 ```bash
-# 自检：固定样例，可逐笔核对
+# Self-check on the fixed fixture
 python module3/run_engine.py --dataset module3/fixtures/fixed_demo --strategy all
 
-# 换汇与余额守恒的端到端验证
-python -m unittest discover -s module3/tests -v      # 13 个测试
+# End-to-end checks (cash conservation, event ordering, reproducibility)
+python -m unittest discover -s module3/tests -v      # 13 tests
 
-# 用完整的 module2 数据集（需先把 module2 仓库放在同级）
+# Full Module 2 dataset (place the module 2 repo alongside first)
 python module3/run_engine.py \
   --dataset module2_ref/FTEC5510-mBridge-Module2-Copy-main/outputs/pilot/baseline/seed_1001 \
   --strategy all --out module3_outputs
 ```
 
-> `tests/` 里依赖 module2 全量数据的用例会**自动跳过**（`SkipTest`），所以没有
-> module2 仓库也能完整跑通自检部分。
+> Tests that need the full Module 2 dataset **skip automatically** (`SkipTest`),
+> so the self-check part runs anywhere.
 
-产物写到 `<out>/<run_id>/`：
+Output is written to `<out>/<run_id>/`:
 
 ```
-run_id = <dataset_id>_<strategy>      例如 pilot_baseline_seed_1001_S0
+run_id = <dataset_id>_<strategy>      e.g. pilot_baseline_seed_1001_S0
 
-payment_results.csv   # 契约规定的 10 列
-events.csv            # 契约规定的 8 列
-balances.csv          # 契约规定的 10 列
-fx_trades.csv         # 补充：模块6 算 FX 经济成本用（需模块6 同意）
-run_summary.json      # 本次运行的配置快照与计数
+payment_results.csv   # the 10 columns fixed by the team specification
+events.csv            # the 8 columns fixed by the team specification
+balances.csv          # the 10 columns fixed by the team specification
+fx_trades.csv         # supplementary: FX cost input for Module 6 (needs sign-off)
+run_summary.json      # resolved configuration snapshot and counters
 ```
 
 ---
 
-## 2. 目录结构
+## 2. Directory layout
 
 ```
 module3/
-├── run_engine.py            命令行入口
-├── upload_to_github.py      上传工具（Git Data API）
+├── run_engine.py            command-line entry point
+├── upload_to_github.py      upload helper (Git Data API)
 ├── m3engine/
-│   ├── models.py            Payment / Inflow / 金额精度（Decimal 到分）
-│   ├── io.py                读 dataset、校验契约、写结果表
-│   ├── engine.py            事件队列、资金状态机、S0/S1
-│   └── adapters.py          模块4/5 接线口 + 联调用 fallback
+│   ├── models.py            Payment / Inflow and Decimal money precision
+│   ├── io.py                dataset loading, contract validation, writers
+│   ├── engine.py            event queue, cash state machine, S0/S1
+│   └── adapters.py          Module 4/5 seams and integration fallbacks
 ├── fixtures/
-│   ├── PROVENANCE.md        固定样例的来源与完整性说明
-│   └── fixed_demo/          module2 原样复制的 5 个文件（含 manifest SHA256）
-└── tests/test_module3.py    验收测试
+│   ├── PROVENANCE.md        origin and integrity notes for the fixture
+│   └── fixed_demo/          5 files copied verbatim from Module 2 (with SHA256)
+└── tests/test_module3.py    acceptance tests
 ```
 
-`fixtures/fixed_demo/` 与 Module 2 原件**逐字节一致**，`manifest.json` 里的
-SHA256 会在 `load_dataset()` 时自动校验，改动任何一个字节都会报错。
+`fixtures/fixed_demo/` is **byte-identical** to the Module 2 original. The
+SHA256 values in its `manifest.json` are checked by `load_dataset()`, so editing
+a single byte raises an error.
 
 ---
 
-## 3. 已实现的契约
+## 3. Implemented contract
 
-### 3.1 同一秒内的事件顺序
+### 3.1 Same-second event ordering
 
-`engine.py` 的 `EVENT_ORDER`，**这个顺序由模块3 决定，需要写进 interface_spec.md**：
+Defined as `EVENT_ORDER` in `engine.py`. **This ordering is Module 3's
+interpretation and must be confirmed by Module 1/6 and recorded in
+`interface_spec.md`.**
 
-| 优先级 | 事件 | 说明 |
+| Priority | Event | Effect |
 |---|---|---|
-| 0 | `PAYMENT_ARRIVAL` | 新指令到达，进入队列 |
-| 1 | `INFLOW_NOTICE` | 入账通知，**不增加余额** |
-| 2 | `INFLOW_ARRIVAL` | 入账到账，增加 `rmb_total` |
-| 3 | `FX_COMPLETION` | 换汇完成，人民币到账 |
-| 4 | `PAYMENT_CONFIRMATION` | 付款确认，扣减余额、释放锁定 |
-| 5 | `FUNDING_REVIEW` | 定期重评估（`funding_review_interval_sec`） |
+| 0 | `PAYMENT_ARRIVAL` | New instruction arrives and enters the queue |
+| 1 | `INFLOW_NOTICE` | Inflow announced; **does not add cash** |
+| 2 | `INFLOW_ARRIVAL` | Inflow credited; increases `rmb_total` |
+| 3 | `FX_COMPLETION` | FX settles; RMB credited |
+| 4 | `PAYMENT_CONFIRMATION` | Confirmation result; deducts cash, releases the lock |
+| 5 | `FUNDING_REVIEW` | Periodic re-evaluation (`funding_review_interval_sec`) |
 
-同优先级按入库序号（`seq`）处理，保证完全可复现。
+Events of equal priority are ordered by an insertion sequence number, which
+makes every run exactly reproducible.
 
-### 3.2 付款状态机
-
-```
-NOT_ARRIVED --到达--> QUEUED --提交(锁定)--> PENDING --确认成功--> SETTLED
-                        ^                        |
-                        +----确认失败(释放锁定)---+
-
-eligible=false ------------------------------> INELIGIBLE（永不提交）
-```
-
-- 提交时只**锁定**，确认成功才扣减 `rmb_total`；失败释放锁定并回队列。
-- `Available RMB = max(0, rmb_total - rmb_locked - rmb_reserve)`。
-- `Available HKD = max(0, hkd_total - hkd_committed - hkd_liquidity_buffer)`。
-
-### 3.3 FX 计价
+### 3.2 Payment state machine
 
 ```
-有效汇率      = fx_rate × (1 - fx_spread_bps / 10000)
-HKD 本金      = TopUpRMB / 有效汇率
-HKD 手续费    = fx_fee_fixed_hkd
-占用 HKD      = HKD 本金 + 手续费        （发起时占用，完成时扣减）
-点差成本 RMB  = (HKD 本金 - TopUpRMB / fx_rate) × fx_rate
-经济成本 RMB  = 点差成本 + 手续费 × fx_rate
+NOT_ARRIVED --arrival--> QUEUED --submit (lock)--> PENDING --confirm ok--> SETTLED
+                            ^                          |
+                            +---confirm failed (unlock)+
+
+eligible=false ------------------------------------> INELIGIBLE (never submitted)
 ```
 
-`TopUpRMB = max(0, 目标付款金额 - AvailableRMB) + fx_buffer_rmb`，再夹到
-`[fx_topup_min_rmb, fx_topup_max_rmb]` 之间；超出上限视为交易限额不满足。
+- Submission only **locks** funds; `rmb_total` is reduced on successful confirmation.
+- A failed confirmation releases the lock and returns the payment to the queue.
+- `Available RMB = max(0, rmb_total - rmb_locked - rmb_reserve)`
+- `Available HKD = max(0, hkd_total - hkd_committed - hkd_liquidity_buffer)`
+
+### 3.3 FX pricing
+
+```
+effective rate   = fx_rate × (1 - fx_spread_bps / 10000)
+HKD principal    = TopUpRMB / effective rate
+HKD fee          = fx_fee_fixed_hkd
+HKD committed    = HKD principal + HKD fee     (committed at initiation, charged on completion)
+spread cost RMB  = (HKD principal - TopUpRMB / fx_rate) × fx_rate
+economic cost    = spread cost + fee × fx_rate
+```
+
+`TopUpRMB = max(0, target amount - AvailableRMB) + fx_buffer_rmb`, then clamped to
+`[fx_topup_min_rmb, fx_topup_max_rmb]`; exceeding the maximum counts as failing the
+transaction limit.
 
 ---
 
-## 4. 引擎自有参数（Module 2 的 config 里没有，需要全组确认）
+## 4. Engine-owned parameters
 
-| 参数 | 默认 | 理由 |
+These are **not** in the Module 2 config; Module 3 owns them and the team must
+confirm the values.
+
+| Parameter | Default | Rationale |
 |---|---|---|
-| `payment_confirmation_delay_sec` | 10 | proposal 4.1.4 的基线确认延迟；module2 config 未包含 |
-| `payment_confirmation_fail_prob` | 0.0 | 基线不做确认失败 |
-| `observation_drain_sec` | 0 | 观察终点 = `simulation_window_sec` + drain |
-| `fx_buffer_rmb` | 0.0 | proposal 4.2.3 基线 buffer=0 |
-| `fx_counterparty_capacity_mode` | `per_trade` | **口径解释见下** |
+| `payment_confirmation_delay_sec` | 10 | baseline confirmation delay from proposal 4.1.4; absent from the Module 2 config |
+| `payment_confirmation_fail_prob` | 0.0 | no confirmation failures in the baseline |
+| `observation_drain_sec` | 0 | observation endpoint = `simulation_window_sec` + drain |
+| `fx_buffer_rmb` | 0.0 | baseline buffer of 0 per proposal 4.2.3 |
+| `fx_counterparty_capacity_mode` | `per_trade` | interpretation, see below |
 
-放入 `config.json` 的 `engine_parameters` 子对象或同名顶层字段即可覆盖。
+Override them either as top-level keys in `config.json` or inside an
+`engine_parameters` object.
 
-### 需要拍板的两条口径
+### Two interpretations that need a decision
 
-1. **`fx_counterparty_capacity_rmb` 是单笔上限还是全程累计额度？**
-   本实现默认 **单笔上限**（与 `fx_topup_max_rmb` 同为交易限额）。
-   若改成累计额度，把 `fx_counterparty_capacity_mode` 设为 `cumulative`，一行切换。
-2. **`eligible=false` 怎么算？**
-   本实现：不提交、不占用资金、终态记 `INELIGIBLE`，不计入完成率分子。
-   是否计入完成率分母、是否计入违约率，需要模块6 一并确认。
+1. **Is `fx_counterparty_capacity_rmb` a per-trade ceiling or a cumulative quota?**
+   This implementation treats it as a **per-trade ceiling**, consistent with
+   `fx_topup_max_rmb` being a transaction limit. Set
+   `fx_counterparty_capacity_mode` to `cumulative` to switch.
+2. **How should `eligible=false` be treated?**
+   This implementation never submits such a payment, never reserves funds, reports
+   the terminal status `INELIGIBLE`, and excludes it from the numerator of the
+   completion rate. Whether it belongs in the denominator, and whether it counts
+   towards the breach rate, must be agreed with Module 6.
 
 ---
 
-## 5. 与模块4 / 模块5 的接线
+## 5. Wiring Module 4 and Module 5
 
-模块3 只认两个函数：
+Module 3 depends on exactly two functions:
 
 ```python
 rank_payments(queue, state, config) -> {"order": [...], "scores": {...}}
@@ -144,81 +161,87 @@ decide_funding(queue, state, known_inflows, config, mode)
     -> {"action": "WAIT"|"TOP_UP"|"NO_ACTION", "target_payment_id", "topup_rmb", "reason"}
 ```
 
-- 模块4 交 `module4_rank.py`、模块5 交 `module5_funding.py`，放进 `m3engine/`
-  或 `PYTHONPATH` 即可自动接管；也可用环境变量 `M3_MODULE4_MODULE` /
-  `M3_MODULE5_MODULE` 指定模块名。
-- `queue` / `state` 里的金额是 `Decimal`，时间是 `int` 秒。
-- **模块5 拿到的 `known_inflows` 只包含已通知、尚未到账、且在
-  `max_lookahead_sec` 内的入账**，永远不是完整的 `inflows.csv`。
-- 未提供真实实现时使用 `adapters.py` 的 fallback，`run_summary.json` 里
-  `using_fallback_module4/5` 会标 `true`，CLI 也会打警告。
+- Module 4 delivers `module4_rank.py`, Module 5 delivers `module5_funding.py`.
+  Drop them in `m3engine/` or anywhere on `PYTHONPATH` and the engine picks them
+  up; the module name can also be set with `M3_MODULE4_MODULE` /
+  `M3_MODULE5_MODULE`.
+- Money inside `queue` and `state` is `Decimal`; time is `int` seconds.
+- **`known_inflows` contains only announced, not-yet-credited inflows inside
+  `max_lookahead_sec`** — never the complete `inflows.csv`.
+- Without the real implementations the fallbacks in `adapters.py` are used;
+  `run_summary.json` then sets `using_fallback_module4/5` to `true` and the CLI
+  prints a warning.
 
 ---
 
-## 6. 验证状态
+## 6. Verification status
 
-| 检查 | 结果 |
+| Check | Result |
 |---|---|
-| 模块3 验收测试 | 13/13 通过 |
-| 内置样例与 module2 原件 | 逐字节一致（有测试守住） |
-| module2 `fixed_demo` 事件时间线 | 与 `expected_exogenous_events.csv` 逐条一致 |
-| `P000001` 是否早于到达结算 | 否（这条测试抓出过一个真实 bug） |
-| `I000001` 是否在 450 秒前变成可用资金 | 否 |
-| 人民币 / 港币守恒 | pilot 全部策略精确到分 |
-| pilot 21 个 dataset × 5 策略 | 105 次运行，0 失败 |
-| formal 210 个 dataset × 5 策略 | 1050 次运行，0 失败，约 30 秒 |
+| Module 3 acceptance tests | 13/13 pass |
+| Built-in fixture vs Module 2 original | byte-identical (guarded by a test) |
+| `fixed_demo` exogenous event timeline | matches `expected_exogenous_events.csv` entry by entry |
+| Does `P000001` settle before it arrives? | No (this test caught a real bug) |
+| Is `I000001` spendable before 450 s? | No |
+| RMB / HKD conservation | exact to the cent, all pilot strategies |
+| 21 pilot datasets × 5 strategies | 105 runs, 0 failures |
+| 210 formal datasets × 5 strategies | 1050 runs, 0 failures, about 30 s |
 
 ---
 
-## 7. 已知限制
+## 7. Known limitations
 
-1. **S2/S3/S4 不是模块3 的交付内容**，目前跑的是 fallback，数字不能进报告。
-2. `fx_trades.csv` 是模块3 的补充输出，团队规范里没有这张表，需要模块6 确认
-   是否采用；若不采用，FX 成本只能从 `reason` 字段里解析。
-3. 事件时间全部为整数秒（遵循 module2 契约）；若将来引入亚秒级延迟，需要同步改
-   `EVENT_ORDER` 的平局规则。
-4. 余额快照在**每个事件**写一行，用于模块6 积分流动性小时数；单次运行约 1000 行。
+1. **S2/S3/S4 are not part of the Module 3 deliverable.** They currently run on
+   fallbacks and their numbers must not go into the report.
+2. `fx_trades.csv` is a Module 3 supplementary output that the team specification
+   does not define. Module 6 must either adopt it or parse the `reason` field.
+3. All event times are integer seconds, following the Module 2 contract. Sub-second
+   latencies would require revisiting the `EVENT_ORDER` tie-breaking rule.
+4. A balance snapshot is written for **every** event so Module 6 can integrate
+   liquidity hours; this is roughly 1000 rows per run.
 
 ---
 
-## 8. 上传到 GitHub
+## 8. Uploading to GitHub
 
-用 `upload_to_github.py`，走 Git Data API，整个目录只产生**一个提交**。
+`upload_to_github.py` uses the Git Data API and produces **one commit** for the
+whole directory.
 
-### 8.1 先建 token
+### 8.1 Create a token
 
-GitHub → Settings → Developer settings → **Personal access tokens → Fine-grained tokens**
-→ Generate new token：
+GitHub → Settings → Developer settings → **Personal access tokens → Fine-grained
+tokens** → Generate new token:
 
-- **Repository access** 选 `Only select repositories`，勾上你的目标仓库
-- **Permissions → Repository permissions → Contents** 设为 `Read and write`
-- 有效期建议 7 天，交完作业就撤销
+- **Repository access**: `Only select repositories`, pick the target repository
+- **Permissions → Repository permissions → Contents**: `Read and write`
+- Use a short expiry (7 days) and revoke it once the coursework is submitted
 
-### 8.2 上传
+### 8.2 Upload
 
 ```bash
-export GITHUB_TOKEN=github_pat_xxx      # 只存在于当前 shell，不要写进任何文件
+export GITHUB_TOKEN=github_pat_xxx      # current shell only; never write it to a file
 
-# 先看一眼会传什么（不联网）
-python module3/upload_to_github.py --owner <你的用户名> --repo <仓库名> --dry-run
+# see what would be uploaded (no network)
+python module3/upload_to_github.py --owner <you> --repo <repo name> --dry-run
 
-# 仓库已存在
-python module3/upload_to_github.py --owner <你的用户名> --repo <仓库名>
+# repository already exists
+python module3/upload_to_github.py --owner <you> --repo <repo name>
 
-# 仓库还不存在，顺手建一个私有仓库
-python module3/upload_to_github.py --owner <你的用户名> --repo FTEC5510-Module3 --create
+# create a private repository if it does not exist yet
+python module3/upload_to_github.py --owner <you> --repo FTEC5510-Module3 --create
 ```
 
-文件会落到仓库的 `module3/` 目录下，可用 `--dest` 改。
+Files land under `module3/` in the repository; change that with `--dest`.
 
-### 8.3 为什么不直接用 Contents API
+### 8.3 Why not the Contents API
 
-`PUT /repos/{owner}/{repo}/contents/{path}` 一次只能写一个文件，9 个文件就是 9 个
-commit，而且并发时容易互相覆盖。本脚本用的是：
+`PUT /repos/{owner}/{repo}/contents/{path}` writes one file per call, so nine files
+mean nine commits, and concurrent pushes can overwrite each other. This script uses:
 
 ```
-blobs → tree(base_tree=当前tree) → commit(parents=当前commit) → PATCH ref
+blobs -> tree (base_tree = current tree) -> commit (parents = current commit) -> PATCH ref
 ```
 
-好处是**原子性**：任何一步失败，远端分支一动不动；而且是一次提交，历史干净。
-`base_tree` 这一项很关键——漏了它会把仓库里已有的文件全部清掉。
+The benefit is **atomicity**: if any step fails the remote branch does not move, and
+the history stays clean. `base_tree` is essential — omit it and the new tree replaces
+everything already in the repository.

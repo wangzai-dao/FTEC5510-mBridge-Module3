@@ -1,6 +1,6 @@
-"""FTEC5510 Group 12 — 模块3：流动性感知的 mBridge 结算引擎。
+"""FTEC5510 Group 12 - Module 3: liquidity-aware mBridge settlement engine.
 
-只依赖 Python 标准库。输入是 Module 2 生成的 dataset 目录
+Standard library only. Input is a Module 2 dataset directory
 （payments.csv / inflows.csv / config.json / manifest.json）。
 """
 

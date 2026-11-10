@@ -1,19 +1,19 @@
-"""与模块4（动态排序）、模块5（等待/换汇决策）的接线口。
+"""Integration seams for Module 4 (dynamic ranking) and Module 5 (wait / FX decision).
 
-模块3 只认两个函数，签名来自 integration_contract.md：
+Module 3 depends on exactly two functions, signatures taken from integration_contract.md:
 
     rank_payments(queue, state, config) -> {"order": [payment_id, ...], "scores": {...}}
     decide_funding(queue, state, known_inflows, config, mode)
         -> {"action": "WAIT"|"TOP_UP"|"NO_ACTION", "target_payment_id", "topup_rmb", "reason"}
 
-模块4/5 只要各自提供 `module4_rank.py` / `module5_funding.py`（放在本目录或
-PYTHONPATH 上），引擎会自动加载；也可以用环境变量指定模块名：
+Module 4/5 only need to provide `module4_rank.py` / `module5_funding.py` (in this directory or
+on PYTHONPATH) and the engine loads them automatically; the module name can also be set by env var:
 
     M3_MODULE4_MODULE=my_rank_module
     M3_MODULE5_MODULE=my_funding_module
 
-拿不到真实实现时使用下列 fallback。fallback 的输出**不代表模块4/5 的最终结论**，
-只用于让 S2–S4 能跑通集成流程，run_summary.json 里会标注 using_fallback=true。
+Fallbacks below are used when the real implementations are absent. Their output is **not**
+a Module 4/5 conclusion; it only keeps the S2-S4 integration path runnable. run_summary.json marks using_fallback=true.
 """
 
 from __future__ import annotations
@@ -26,13 +26,13 @@ from .models import ZERO, money
 
 
 # --------------------------------------------------------------------------
-# 模块4：排序
+# Module 4: ranking
 # --------------------------------------------------------------------------
 
 def fallback_rank_payments(queue: list[dict], state: dict, config: dict) -> dict:
-    """占位实现：按 config.ranking_parameters 打分，仅用于联调。
+    """Placeholder: scores with config.ranking_parameters, integration testing only.
 
-    模块4 交付后应完全替换本函数。
+    Replace this function entirely once Module 4 is delivered.
     """
     params = config.get("ranking_parameters", {})
     points = params.get("priority_points", {"URGENT": 3.0, "HIGH": 2.0, "NORMAL": 1.0})
@@ -64,7 +64,7 @@ def fallback_rank_payments(queue: list[dict], state: dict, config: dict) -> dict
 
 
 def load_rank_payments():
-    """返回 (函数, 是否使用了 fallback)。"""
+    """Return (function, used_fallback)."""
     name = os.environ.get("M3_MODULE4_MODULE", "module4_rank")
     try:
         module = importlib.import_module(name)
@@ -75,12 +75,12 @@ def load_rank_payments():
 
 
 # --------------------------------------------------------------------------
-# 模块5：等待 / 换汇决策
+# Module 5: wait / FX decision
 # --------------------------------------------------------------------------
 
 def fallback_decide_funding(queue: list[dict], state: dict, known_inflows: list[dict],
                             config: dict, mode: str) -> dict:
-    """占位实现：永远立即换汇。仅用于联调，模块5 交付后应完全替换。"""
+    """Placeholder: always tops up immediately. Integration testing only; replace once Module 5 is delivered."""
     available = money(state["rmb_available"])
     for payment in queue:
         gap = payment["amount_rmb"] - available
@@ -97,7 +97,7 @@ def fallback_decide_funding(queue: list[dict], state: dict, known_inflows: list[
 
 
 def load_decide_funding():
-    """返回 (函数, 是否使用了 fallback)。"""
+    """Return (function, used_fallback)."""
     name = os.environ.get("M3_MODULE5_MODULE", "module5_funding")
     try:
         module = importlib.import_module(name)

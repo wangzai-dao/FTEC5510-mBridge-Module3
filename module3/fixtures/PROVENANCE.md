@@ -1,36 +1,45 @@
-# 固定样例来源说明
+# Fixture provenance
 
-`fixed_demo/` 下的 5 个文件**原样复制**自 Module 2 仓库，未做任何修改：
+The five files under `fixed_demo/` are **copied verbatim** from the Module 2
+repository; nothing was modified.
 
-| 项 | 值 |
+| Item | Value |
 |---|---|
-| 来源仓库 | `FTEC5510-mBridge-Module2-Copy`（私有） |
-| 仓库内路径 | `examples/fixed_demo/` |
-| 文件 | `config.json`、`payments.csv`、`inflows.csv`、`expected_exogenous_events.csv`、`manifest.json` |
+| Source repository | `FTEC5510-mBridge-Module2-Copy` (private) |
+| Path inside that repo | `examples/fixed_demo/` |
+| Files | `config.json`, `payments.csv`, `inflows.csv`, `expected_exogenous_events.csv`, `manifest.json` |
 | `dataset_id` | `fixed_demo_v1` |
 | `schema_version` | `1.0.0` |
-| 规模 | 10 笔付款、3 笔入账，观察窗口 7200 秒 |
+| Scale | 10 payments, 3 inflows, 7200-second observation window |
 
-## 为什么复制进来
+## Why it is copied here
 
-模块3 的验收测试需要一份**手工可核对**的输入。把样例放进本仓库有两个好处：
+The Module 3 acceptance tests need a **hand-checkable** input. Shipping the fixture
+in this repository means:
 
-1. 别人 clone 下来就能 `python -m unittest` 跑通，不依赖 module2 仓库；
-2. 样例版本跟着代码走，不会出现"代码换了、样例还是旧的"。
+1. a fresh clone can run `python -m unittest` without the Module 2 repository;
+2. the fixture version travels with the code, so the two cannot drift apart.
 
-## 完整性约束
+## Integrity constraint
 
-`manifest.json` 里记录了其余 4 个文件的 SHA256。`m3engine.io.load_dataset()`
-默认会校验，只要任何一个文件被改动就会直接报错。
+`manifest.json` records the SHA256 of the other four files.
+`m3engine.io.load_dataset()` verifies them by default and fails immediately if any
+file has been altered.
 
-因此**不要手工编辑这个目录里的任何文件**。要换样例，从 Module 2 重新复制，
-并确认 `python module3/run_engine.py --dataset module3/fixtures/fixed_demo --strategy S1 --dry-run`
-能通过。
+**Do not edit anything in this directory by hand.** To refresh the fixture, copy it
+again from Module 2 and confirm that
 
-## 这是输入，不是结果
+```bash
+python module3/run_engine.py --dataset module3/fixtures/fixed_demo --strategy S1 --dry-run
+```
 
-这份样例只包含外生事件（付款到达、入账通知、入账到账），**不含任何结算结果**。
-结算结果由模块3 运行时产生：
+still succeeds.
+
+## This is input, not results
+
+The fixture contains exogenous events only (payment arrivals, inflow notices,
+inflow credits) and **no settlement outcome**. Settlement results are produced at
+runtime:
 
 ```bash
 python module3/run_engine.py --dataset module3/fixtures/fixed_demo --strategy all --out module3_outputs

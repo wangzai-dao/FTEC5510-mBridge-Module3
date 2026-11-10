@@ -1,9 +1,9 @@
-"""数据模型与货币精度工具（模块3 内部使用）。
+"""Data models and money-precision helpers (Module 3 internal).
 
-约定：
-  * 时间一律为整数秒（Module 2 data_dictionary v1.0.0）。
-  * 金额一律为 Decimal，量化到 0.01，避免浮点误差导致余额对不上。
-  * priority 只允许 URGENT / HIGH / NORMAL。
+Conventions:
+  * time is integer seconds (Module 2 data_dictionary v1.0.0).
+  * money is Decimal quantized to 0.01 so balances reconcile exactly.
+  * priority is restricted to URGENT / HIGH / NORMAL.
 """
 
 from __future__ import annotations
@@ -15,12 +15,12 @@ CENT = Decimal("0.01")
 
 PRIORITIES = ("URGENT", "HIGH", "NORMAL")
 
-# 付款最终状态。Module 6 的指标口径需要与此一致。
-NOT_ARRIVED = "NOT_ARRIVED"  # 引擎内部状态：尚未到达，不进入队列
-QUEUED = "QUEUED"          # 在队列中排队，未提交
-PENDING = "PENDING"        # 已提交、资金已锁定，等待确认
-SETTLED = "SETTLED"        # 确认成功，已结算
-INELIGIBLE = "INELIGIBLE"  # eligible=false，引擎不提交
+# Terminal payment states. Module 6 metric definitions must align with these.
+NOT_ARRIVED = "NOT_ARRIVED"  # internal only: not yet arrived, never queued
+QUEUED = "QUEUED"          # queued, not yet submitted
+PENDING = "PENDING"        # submitted, cash locked, awaiting confirmation
+SETTLED = "SETTLED"        # confirmation succeeded, settled
+INELIGIBLE = "INELIGIBLE"  # eligible=false, never submitted
 
 
 def ZERO() -> Decimal:
@@ -28,7 +28,7 @@ def ZERO() -> Decimal:
 
 
 def money(value) -> Decimal:
-    """把任意数值安全转换为两位小数的 Decimal。"""
+    """Safely convert any numeric value to a 2-decimal Decimal."""
     if isinstance(value, Decimal):
         amount = value
     else:

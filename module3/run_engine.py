@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""模块3 命令行入口。
+"""Module 3 command-line entry point.
 
-用法：
-    python run_engine.py --dataset <module2 dataset 目录> --strategy S0
-    python run_engine.py --dataset <目录> --strategy all --out outputs
-    python run_engine.py --dataset <目录> --strategy all --dry-run
+Usage:
+    python run_engine.py --dataset <module 2 dataset directory> --strategy S0
+    python run_engine.py --dataset <directory> --strategy all --out outputs
+    python run_engine.py --dataset <directory> --strategy all --dry-run
 
-输出：<out>/<run_id>/{payment_results.csv, events.csv, balances.csv,
+Output: <out>/<run_id>/{payment_results.csv, events.csv, balances.csv,
                       fx_trades.csv, run_summary.json}
 """
 
@@ -29,15 +29,15 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dataset", required=True,
-                        help="Module 2 生成的 dataset 目录（含 config.json）")
+                        help="Module 2 dataset directory (contains config.json)")
     parser.add_argument("--strategy", default="S1",
-                        help="S0/S1/S2/S3/S4 或 all，默认 S1")
+                        help="S0/S1/S2/S3/S4 or all (default S1)")
     parser.add_argument("--out", default="module3_outputs",
-                        help="输出根目录，默认 module3_outputs")
+                        help="output root directory (default module3_outputs)")
     parser.add_argument("--no-verify-manifest", action="store_true",
-                        help="跳过 manifest.json 的 SHA256 校验")
+                        help="skip the manifest.json SHA256 verification")
     parser.add_argument("--dry-run", action="store_true",
-                        help="只在终端打印摘要，不写文件")
+                        help="print a summary only, write no files")
     return parser.parse_args()
 
 
@@ -46,13 +46,13 @@ def main() -> int:
     strategies = STRATEGIES if args.strategy.lower() == "all" else (args.strategy.upper(),)
     for strategy in strategies:
         if strategy not in STRATEGIES:
-            print(f"未知策略 {strategy}", file=sys.stderr)
+            print(f"unknown strategy {strategy}", file=sys.stderr)
             return 2
 
     try:
         dataset = load_dataset(args.dataset, verify_manifest=not args.no_verify_manifest)
     except DatasetError as exc:
-        print(f"[输入错误] {exc}", file=sys.stderr)
+        print(f"[input error] {exc}", file=sys.stderr)
         return 1
 
     print(f"dataset = {dataset.dataset_id}")
@@ -86,12 +86,12 @@ def main() -> int:
 
     print()
     if fallback4 or fallback5:
-        print("警告：S2/S3/S4 使用 adapters.py 里的 fallback（模块4 排序 / 模块5 决策）。")
-        print("      这些结果只用于联调，不能写进报告。模块4/5 交付后自动接管。")
+        print("WARNING: S2/S3/S4 are using the fallbacks in adapters.py (Module 4 ranking / Module 5 decision).")
+        print("         Integration only - do not report these numbers. Module 4/5 take over automatically once delivered.")
     elif any(s in ("S2", "S3", "S4") for s in strategies):
-        print("模块4/5 的真实实现已接入。")
+        print("Real Module 4/5 implementations are in use.")
     else:
-        print("S0/S1 不依赖模块4/5，结果可直接用于报告。")
+        print("S0/S1 do not depend on Module 4/5; these results are ready for the report.")
     return 0
 
 
