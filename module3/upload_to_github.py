@@ -163,7 +163,8 @@ def main() -> int:
     tree_items = []
     for path in files:
         relative = path.relative_to(source)
-        target = f"{args.dest.strip('/')}/{relative.as_posix()}"
+        prefix = args.dest.strip("/")
+        target = f"{prefix}/{relative.as_posix()}" if prefix else relative.as_posix()
         blob = api("POST", f"{repo_path}/git/blobs", token, {
             "content": base64.b64encode(path.read_bytes()).decode("ascii"),
             "encoding": "base64",
