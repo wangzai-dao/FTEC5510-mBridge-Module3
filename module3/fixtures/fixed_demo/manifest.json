@@ -1,0 +1,20 @@
+{
+  "advance_notice_inflows": 2,
+  "dataset_id": "fixed_demo_v1",
+  "inflows": 3,
+  "inflows_after_observation_window": 0,
+  "note": "Generated synthetic external events. Never treat these as settled payments or simulated strategy results.",
+  "payments": 10,
+  "phase": "fixed",
+  "scenario_id": "baseline",
+  "schema_version": "1.0.0",
+  "seed": 0,
+  "sha256": {
+    "config.json": "4a5c5eac295a8c15e9906f5c70e809efea3231909302e19ccf3cc37131d717c3",
+    "expected_exogenous_events.csv": "5acea8619bb6b253b61c6247a58c17e01016de073e9004c133c34c58561264fd",
+    "inflows.csv": "d570abe881d918db9ae704973bde8794aed83594052d9265d1844ba46d7d15ce",
+    "payments.csv": "931326dafdcaa72f10fb3bca9ac9b8d52f2bf4a9ae3ffb0684300aa19680f9b1"
+  },
+  "total_inflows_rmb": "670000.00",
+  "total_payments_rmb": "1822000.00"
+}

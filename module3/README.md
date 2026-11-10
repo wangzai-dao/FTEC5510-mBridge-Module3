@@ -10,20 +10,23 @@ FTEC5510 Group 12 · mBridge HKD/RMB 流动性感知结算
 
 ## 1. 快速开始
 
-```bash
-# 固定样例（10 笔付款 / 3 笔入账，可逐笔核对）
-python run_engine.py \
-  --dataset module2_ref/FTEC5510-mBridge-Module2-Copy-main/examples/fixed_demo \
-  --strategy all
+仓库**自带固定样例** `fixtures/fixed_demo/`（10 笔付款 / 3 笔入账），clone 下来直接能跑：
 
-# pilot 种子 1001
-python run_engine.py \
+```bash
+# 自检：固定样例，可逐笔核对
+python module3/run_engine.py --dataset module3/fixtures/fixed_demo --strategy all
+
+# 换汇与余额守恒的端到端验证
+python -m unittest discover -s module3/tests -v      # 13 个测试
+
+# 用完整的 module2 数据集（需先把 module2 仓库放在同级）
+python module3/run_engine.py \
   --dataset module2_ref/FTEC5510-mBridge-Module2-Copy-main/outputs/pilot/baseline/seed_1001 \
   --strategy all --out module3_outputs
-
-# 验收测试（12 个）
-python -m unittest discover -s module3/tests -v
 ```
+
+> `tests/` 里依赖 module2 全量数据的用例会**自动跳过**（`SkipTest`），所以没有
+> module2 仓库也能完整跑通自检部分。
 
 产物写到 `<out>/<run_id>/`：
 
@@ -44,13 +47,20 @@ run_summary.json      # 本次运行的配置快照与计数
 ```
 module3/
 ├── run_engine.py            命令行入口
+├── upload_to_github.py      上传工具（Git Data API）
 ├── m3engine/
 │   ├── models.py            Payment / Inflow / 金额精度（Decimal 到分）
 │   ├── io.py                读 dataset、校验契约、写结果表
 │   ├── engine.py            事件队列、资金状态机、S0/S1
 │   └── adapters.py          模块4/5 接线口 + 联调用 fallback
+├── fixtures/
+│   ├── PROVENANCE.md        固定样例的来源与完整性说明
+│   └── fixed_demo/          module2 原样复制的 5 个文件（含 manifest SHA256）
 └── tests/test_module3.py    验收测试
 ```
+
+`fixtures/fixed_demo/` 与 Module 2 原件**逐字节一致**，`manifest.json` 里的
+SHA256 会在 `load_dataset()` 时自动校验，改动任何一个字节都会报错。
 
 ---
 
@@ -149,7 +159,8 @@ decide_funding(queue, state, known_inflows, config, mode)
 
 | 检查 | 结果 |
 |---|---|
-| 模块3 验收测试 | 12/12 通过 |
+| 模块3 验收测试 | 13/13 通过 |
+| 内置样例与 module2 原件 | 逐字节一致（有测试守住） |
 | module2 `fixed_demo` 事件时间线 | 与 `expected_exogenous_events.csv` 逐条一致 |
 | `P000001` 是否早于到达结算 | 否（这条测试抓出过一个真实 bug） |
 | `I000001` 是否在 450 秒前变成可用资金 | 否 |

@@ -23,7 +23,10 @@ sys.path.insert(0, str(ROOT / "module3"))
 from m3engine import DatasetError, load_dataset, run_dataset, write_outputs  # noqa: E402
 
 MODULE2 = ROOT / "module2_ref" / "FTEC5510-mBridge-Module2-Copy-main"
-FIXED_DEMO = MODULE2 / "examples" / "fixed_demo"
+FIXED_DEMO_SOURCE = MODULE2 / "examples" / "fixed_demo"
+# 优先用仓库内置样例，这样 clone 下来不依赖 module2 仓库也能跑
+FIXTURE = ROOT / "module3" / "fixtures" / "fixed_demo"
+FIXED_DEMO = FIXTURE if FIXTURE.exists() else FIXED_DEMO_SOURCE
 PILOT_SEED_1001 = MODULE2 / "outputs" / "pilot" / "baseline" / "seed_1001"
 STRATEGIES = ("S0", "S1", "S2", "S3", "S4")
 
@@ -184,6 +187,16 @@ class AccountingTests(unittest.TestCase):
 
 
 class ManifestAndOutputTests(unittest.TestCase):
+    def test_fixture_is_byte_identical_to_module2_source(self):
+        """仓库内置样例必须和 module2 原件逐字节一致，防止悄悄漂移。"""
+        if not FIXED_DEMO_SOURCE.exists():
+            raise unittest.SkipTest("本机没有 module2 仓库，跳过比对")
+        for name in ("config.json", "payments.csv", "inflows.csv",
+                     "expected_exogenous_events.csv", "manifest.json"):
+            self.assertEqual((FIXTURE / name).read_bytes(),
+                             (FIXED_DEMO_SOURCE / name).read_bytes(),
+                             f"{name} 与 module2 原件不一致")
+
     def test_manifest_tampering_is_detected(self):
         _require(FIXED_DEMO)
         with tempfile.TemporaryDirectory() as tmp:
