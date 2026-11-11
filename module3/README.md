@@ -13,24 +13,29 @@ library only — no third-party dependencies.
 
 ## 1. Quick start
 
-The repository ships a **hand-checkable fixture** in `fixtures/fixed_demo/`
-(10 payments, 3 inflows), so a fresh clone runs immediately:
+The repository ships both fixture bundles, so a fresh clone runs the complete
+suite without access to the Module 2 repository:
 
 ```bash
-# Self-check on the fixed fixture
+# End-to-end checks: contract timeline, cash conservation, reproducibility,
+# and every pilot scenario x strategy (16 tests, about 3 s)
+python -m unittest discover -s module3/tests -v
+
+# Self-check on the hand-checkable fixture
 python module3/run_engine.py --dataset module3/fixtures/fixed_demo --strategy all
 
-# End-to-end checks (cash conservation, event ordering, reproducibility)
-python -m unittest discover -s module3/tests -v      # 13 tests
+# Coverage table across the seven scenarios (105 runs)
+python module3/scenario_report.py --root module3/fixtures/pilot --markdown
 
-# Full Module 2 dataset (place the module 2 repo alongside first)
+# One pilot dataset, written to disk
 python module3/run_engine.py \
-  --dataset module2_ref/FTEC5510-mBridge-Module2-Copy-main/outputs/pilot/baseline/seed_1001 \
+  --dataset module3/fixtures/pilot/baseline/seed_1001 \
   --strategy all --out module3_outputs
 ```
 
-> Tests that need the full Module 2 dataset **skip automatically** (`SkipTest`),
-> so the self-check part runs anywhere.
+> If a full Module 2 checkout is present at `module2_ref/`, the tests use it
+> instead; otherwise they fall back to the bundled fixtures. Only the
+> byte-identity check against the Module 2 original is skipped when it is absent.
 
 Output is written to `<out>/<run_id>/`:
 
@@ -51,6 +56,7 @@ run_summary.json      # resolved configuration snapshot and counters
 ```
 module3/
 ├── run_engine.py            command-line entry point
+├── scenario_report.py       scenario x strategy coverage table (CI summary)
 ├── upload_to_github.py      upload helper (Git Data API)
 ├── m3engine/
 │   ├── models.py            Payment / Inflow and Decimal money precision
@@ -58,14 +64,15 @@ module3/
 │   ├── engine.py            event queue, cash state machine, S0/S1
 │   └── adapters.py          Module 4/5 seams and integration fallbacks
 ├── fixtures/
-│   ├── PROVENANCE.md        origin and integrity notes for the fixture
-│   └── fixed_demo/          5 files copied verbatim from Module 2 (with SHA256)
+│   ├── PROVENANCE.md        origin and integrity notes for both bundles
+│   ├── fixed_demo/          10 payments, 3 inflows (hand-checkable)
+│   └── pilot/               7 scenarios x 3 seeds = 21 datasets
 └── tests/test_module3.py    acceptance tests
 ```
 
-`fixtures/fixed_demo/` is **byte-identical** to the Module 2 original. The
-SHA256 values in its `manifest.json` are checked by `load_dataset()`, so editing
-a single byte raises an error.
+Both fixture bundles are **byte-identical** to the Module 2 originals. The SHA256
+values in each `manifest.json` are checked by `load_dataset()`, so editing a
+single byte raises an error.
 
 ---
 
@@ -178,14 +185,14 @@ decide_funding(queue, state, known_inflows, config, mode)
 
 | Check | Result |
 |---|---|
-| Module 3 acceptance tests | 13/13 pass |
-| Built-in fixture vs Module 2 original | byte-identical (guarded by a test) |
+| Module 3 acceptance tests | 16/16 pass in about 3 s |
+| Built-in fixtures vs Module 2 originals | byte-identical (guarded by a test) |
 | `fixed_demo` exogenous event timeline | matches `expected_exogenous_events.csv` entry by entry |
 | Does `P000001` settle before it arrives? | No (this test caught a real bug) |
 | Is `I000001` spendable before 450 s? | No |
-| RMB / HKD conservation | exact to the cent, all pilot strategies |
-| 21 pilot datasets × 5 strategies | 105 runs, 0 failures |
-| 210 formal datasets × 5 strategies | 1050 runs, 0 failures, about 30 s |
+| RMB / HKD conservation | exact to the cent, all seven pilot scenarios × five strategies |
+| 21 pilot datasets × 5 strategies | 105 runs, executed in CI on every push |
+| 210 formal datasets × 5 strategies | 1050 runs, 0 failures, about 30 s (run locally) |
 
 ---
 

@@ -23,11 +23,19 @@ sys.path.insert(0, str(ROOT / "module3"))
 from m3engine import DatasetError, load_dataset, run_dataset, write_outputs  # noqa: E402
 
 MODULE2 = ROOT / "module2_ref" / "FTEC5510-mBridge-Module2-Copy-main"
+FIXTURES = ROOT / "module3" / "fixtures"
+SCENARIOS = ("baseline", "low_rmb_liquidity", "payment_surge", "large_payments",
+             "tight_deadlines", "delayed_inflows", "fx_capacity_shock")
+
+# The bundled fixtures make CI self-contained; fall back to the module 2 repo
+# when the fixtures are absent (e.g. running inside a full local checkout).
 FIXED_DEMO_SOURCE = MODULE2 / "examples" / "fixed_demo"
-# prefer the built-in fixture so a fresh clone runs without the module2 repo
-FIXTURE = ROOT / "module3" / "fixtures" / "fixed_demo"
+FIXTURE = FIXTURES / "fixed_demo"
 FIXED_DEMO = FIXTURE if FIXTURE.exists() else FIXED_DEMO_SOURCE
-PILOT_SEED_1001 = MODULE2 / "outputs" / "pilot" / "baseline" / "seed_1001"
+
+PILOT_SOURCE = MODULE2 / "outputs" / "pilot"
+PILOT_ROOT = (FIXTURES / "pilot") if (FIXTURES / "pilot").exists() else PILOT_SOURCE
+PILOT_SEED_1001 = PILOT_ROOT / "baseline" / "seed_1001"
 STRATEGIES = ("S0", "S1", "S2", "S3", "S4")
 
 EXOGENOUS = {"PAYMENT_ARRIVAL", "INFLOW_NOTICE", "INFLOW_ARRIVAL"}
@@ -184,6 +192,63 @@ class AccountingTests(unittest.TestCase):
         self.assertEqual(first.payments, second.payments)
         self.assertEqual(first.events, second.events)
         self.assertEqual(first.balances, second.balances)
+
+
+class StressScenarioTests(unittest.TestCase):
+    """Runs every bundled pilot dataset, so all seven scenarios exercise the
+    engine in CI - not just the hand-checkable fixed fixture."""
+
+    @classmethod
+    def setUpClass(cls):
+        _require(PILOT_ROOT)
+        cls.datasets = sorted(PILOT_ROOT.glob("*/seed_*"))
+
+    def test_all_seven_scenarios_are_present(self):
+        self.assertGreaterEqual(len(self.datasets), 7,
+                                f"expected pilot datasets under {PILOT_ROOT}")
+        found = {path.parent.name for path in self.datasets}
+        for scenario in SCENARIOS:
+            self.assertIn(scenario, found, f"scenario {scenario} missing from the fixtures")
+
+    def test_every_scenario_conserves_cash_for_every_strategy(self):
+        checked = 0
+        for directory in self.datasets:
+            dataset = load_dataset(directory)
+            for strategy in STRATEGIES:
+                result = run_dataset(dataset, strategy)
+                expected = (Decimal(str(dataset.config["initial_rmb_balance"]))
+                            + _arrived_inflow_total(dataset)
+                            + _fx_total(result)
+                            - _settled_total(result))
+                actual = Decimal(result.summary["rmb_total_end"])
+                self.assertEqual(
+                    actual, expected,
+                    f"{dataset.dataset_id} / {strategy}: RMB balance is not conserved")
+                for row in result.balances:
+                    for key in ("rmb_available", "hkd_available", "rmb_locked"):
+                        self.assertGreaterEqual(
+                            Decimal(row[key]), Decimal("0"),
+                            f"{dataset.dataset_id} / {strategy}: {key} went negative")
+                checked += 1
+        self.assertEqual(checked, len(self.datasets) * len(STRATEGIES))
+
+    def test_stressed_scenarios_actually_bind(self):
+        """A stress scenario that never binds would be useless coverage."""
+        baseline = load_dataset(PILOT_ROOT / "baseline" / "seed_1001")
+        settled_baseline = run_dataset(baseline, "S1").summary["settled"]
+        self.assertEqual(settled_baseline, baseline.config["data_generation"]["num_payments"],
+                         "baseline should settle every payment at seed 1001")
+
+        binding = 0
+        for directory in self.datasets:
+            if directory.parent.name == "baseline":
+                continue
+            dataset = load_dataset(directory)
+            result = run_dataset(dataset, "S1")
+            if result.summary["settled"] < result.summary["n_payments"]:
+                binding += 1
+        self.assertGreater(binding, 0,
+                           "no stress scenario blocked a payment, so the stress axes bind nothing")
 
 
 class ManifestAndOutputTests(unittest.TestCase):

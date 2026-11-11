@@ -28,6 +28,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 API = "https://api.github.com"
@@ -113,6 +114,8 @@ def main() -> int:
     parser.add_argument("--public", action="store_true", help="make the repo public when using --create")
     parser.add_argument("--force", action="store_true", help="overwrite the remote branch (use with care)")
     parser.add_argument("--dry-run", action="store_true", help="list files only, no network")
+    parser.add_argument("--jobs", type=int, default=8,
+                        help="parallel blob uploads (default 8)")
     parser.add_argument("--token", default=None,
                         help="not recommended: use the GITHUB_TOKEN env var")
     args = parser.parse_args()
@@ -159,19 +162,26 @@ def main() -> int:
     except SystemExit:
         print("Branch is empty; creating the first commit")
 
-    # 2) one blob per file
-    tree_items = []
+    # 2) one blob per file (concurrently: a fixture bundle is ~100 files)
+    prefix = args.dest.strip("/")
+    items = []
     for path in files:
         relative = path.relative_to(source)
-        prefix = args.dest.strip("/")
         target = f"{prefix}/{relative.as_posix()}" if prefix else relative.as_posix()
+        items.append((path, target))
+
+    def make_blob(item):
+        path, target = item
         blob = api("POST", f"{repo_path}/git/blobs", token, {
             "content": base64.b64encode(path.read_bytes()).decode("ascii"),
             "encoding": "base64",
         })
-        tree_items.append({"path": target, "mode": "100644", "type": "blob",
-                           "sha": blob["sha"]})
-        print(f"  blob {target}")
+        return {"path": target, "mode": "100644", "type": "blob", "sha": blob["sha"]}
+
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        tree_items = list(pool.map(make_blob, items))
+    for item in tree_items:
+        print(f"  blob {item['path']}")
 
     # 3) one tree (base_tree keeps existing files instead of wiping them)
     tree_payload = {"tree": tree_items}
