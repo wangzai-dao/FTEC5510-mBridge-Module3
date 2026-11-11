@@ -1,0 +1,91 @@
+{
+  "data_generation": {
+    "deadline_multiplier": 1.0,
+    "deadline_slack_sec": {
+      "HIGH": {
+        "max": 6000,
+        "min": 1800
+      },
+      "NORMAL": {
+        "max": 14400,
+        "min": 5400
+      },
+      "URGENT": {
+        "max": 1800,
+        "min": 300
+      }
+    },
+    "eligible_probability": 1.0,
+    "inflow_amount_lognormal_median_rmb": 350000.0,
+    "inflow_amount_lognormal_sigma": 0.65,
+    "inflow_amount_max_rmb": 2000000.0,
+    "inflow_amount_min_rmb": 20000.0,
+    "inflow_delay_sec": 0,
+    "notice_lead_max_sec": 3600,
+    "notice_lead_min_sec": 300,
+    "num_inflows": 24,
+    "num_payments": 120,
+    "payment_amount_lognormal_median_rmb": 360000.0,
+    "payment_amount_lognormal_sigma": 0.95,
+    "payment_amount_max_rmb": 2000000.0,
+    "payment_amount_min_rmb": 1000.0,
+    "pre_notice_probability": 0.6,
+    "priority_probabilities": {
+      "HIGH": 0.25,
+      "NORMAL": 0.65,
+      "URGENT": 0.1
+    }
+  },
+  "data_source": "synthetic_assumptions_not_observed_bank_transactions",
+  "dataset_id": "formal_large_payments_seed_20027",
+  "funding_review_interval_sec": 60,
+  "fx_counterparty_capacity_rmb": 5000000.0,
+  "fx_execution_delay_sec": 120,
+  "fx_fee_fixed_hkd": 80.0,
+  "fx_rate": 0.9,
+  "fx_safety_buffer_sec": 180,
+  "fx_spread_bps": 15.0,
+  "fx_topup_max_rmb": 2000000.0,
+  "fx_topup_min_rmb": 20000.0,
+  "generator_version": "1.0.0",
+  "hkd_liquidity_buffer": 500000.0,
+  "initial_hkd_balance": 15000000.0,
+  "initial_rmb_balance": 6000000.0,
+  "phase": "formal",
+  "prediction_parameters": {
+    "inflow_confidence_threshold": 0.75,
+    "max_lookahead_sec": 7200,
+    "minimum_advance_notice_sec": 0
+  },
+  "project_name": "FTEC5510 mBridge Payment Liquidity Simulation - Module 2",
+  "project_scope": "Synthetic payment arrivals, RMB inflow announcements and common scenario configuration only",
+  "ranking_parameters": {
+    "aging_normalizer_sec": 7200,
+    "deadline_normalizer_sec": 7200,
+    "priority_points": {
+      "HIGH": 2.0,
+      "NORMAL": 1.0,
+      "URGENT": 3.0
+    },
+    "weight_aging": 0.15,
+    "weight_deadline": 0.4,
+    "weight_priority": 0.45
+  },
+  "rmb_reserve": 800000.0,
+  "scenario_description": "Larger typical payment amount; same arrival path and priorities",
+  "scenario_id": "large_payments",
+  "schema_version": "1.0.0",
+  "seed": 20027,
+  "service_targets": {
+    "max_overdue_fraction": 0.05,
+    "max_p95_delay_sec": 3600,
+    "min_completed_fraction": 0.95
+  },
+  "simulation_window_sec": 28800,
+  "units": {
+    "amount_hkd": "HKD yuan",
+    "amount_rmb": "RMB yuan",
+    "fx_rate": "RMB received per 1 HKD sold (RMB/HKD)",
+    "time": "integer seconds since simulation start (t=0)"
+  }
+}

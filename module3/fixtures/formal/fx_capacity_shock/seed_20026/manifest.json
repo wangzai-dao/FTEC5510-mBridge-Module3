@@ -1,0 +1,20 @@
+{
+  "advance_notice_inflows": 20,
+  "dataset_id": "formal_fx_capacity_shock_seed_20026",
+  "inflows": 24,
+  "inflows_after_observation_window": 0,
+  "note": "Generated synthetic external events. Never treat these as settled payments or simulated strategy results.",
+  "payments": 120,
+  "phase": "formal",
+  "scenario_id": "fx_capacity_shock",
+  "schema_version": "1.0.0",
+  "seed": 20026,
+  "sha256": {
+    "config.json": "a59a9526f7d06265328778e9ff51ca83cfdcfddbcd39574fef837035c27de52c",
+    "expected_exogenous_events.csv": "9e70a8be3a6ef7f4767ff5803d394218c75412ba0b90d89879387c996930f797",
+    "inflows.csv": "794b766a4ef23493af615aaa527f364157bdc01bda7b0266e47d8f05a0482908",
+    "payments.csv": "e70dc427ead029249dbe8ff8a22f47ca0f6ccf0b92135e0de27737b365f130a4"
+  },
+  "total_inflows_rmb": "10576838.24",
+  "total_payments_rmb": "24472871.44"
+}
