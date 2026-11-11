@@ -69,7 +69,7 @@ def main() -> int:
             for s in scenarios]
 
     if args.markdown:
-        print(f"### Scenario coverage - {len(datasets)} datasets, {runs} runs")
+        print(f"### Scenario coverage — Module 2 pilot data ({len(datasets)} datasets, {runs} runs)")
         print()
         print("| " + " | ".join(header) + " |")
         print("|" + "---|" * len(header))
