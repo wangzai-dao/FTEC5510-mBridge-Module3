@@ -9,6 +9,12 @@ on:
     paths:
       - "module3/**"
   workflow_dispatch:
+    inputs:
+      datasets:
+        description: "Which dataset set to report"
+        type: choice
+        options: [pilot, formal, both]
+        default: pilot
 
 permissions:
   contents: read
@@ -45,12 +51,22 @@ jobs:
             --dataset module3/fixtures/fixed_demo \
             --strategy all --out ci_outputs
 
-      - name: Every pilot scenario x strategy
+      - name: Scenario coverage
         if: matrix.python-version == '3.12'
+        env:
+          DATASETS: ${{ github.event.inputs.datasets }}
         run: |
           set -o pipefail
-          python module3/scenario_report.py \
-            --root module3/fixtures/pilot --markdown | tee -a "$GITHUB_STEP_SUMMARY"
+          DATASETS="${DATASETS:-pilot}"
+          echo "Dataset set: $DATASETS"
+          if [ "$DATASETS" = "pilot" ] || [ "$DATASETS" = "both" ]; then
+            python module3/scenario_report.py \
+              --root module3/fixtures/pilot --markdown | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "$DATASETS" = "formal" ] || [ "$DATASETS" = "both" ]; then
+            python module3/scenario_report.py \
+              --root module3/fixtures/formal --markdown | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Publish summary
         if: always()
