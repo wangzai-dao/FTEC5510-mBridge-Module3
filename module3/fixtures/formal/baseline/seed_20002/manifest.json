@@ -1,0 +1,20 @@
+{
+  "advance_notice_inflows": 16,
+  "dataset_id": "formal_baseline_seed_20002",
+  "inflows": 24,
+  "inflows_after_observation_window": 0,
+  "note": "Generated synthetic external events. Never treat these as settled payments or simulated strategy results.",
+  "payments": 120,
+  "phase": "formal",
+  "scenario_id": "baseline",
+  "schema_version": "1.0.0",
+  "seed": 20002,
+  "sha256": {
+    "config.json": "03ff775d3c501ddbd8f738bce82de030a57deebd51927cb540570f0d3b2e9f86",
+    "expected_exogenous_events.csv": "4b93c822a0c96e78a1f4cd45840073728fa9861037b707381d456a383f93cd01",
+    "inflows.csv": "76f024a8b8bca2a48177ff245077c327111c423ab986fea6962d7166c1ead4a0",
+    "payments.csv": "75163b25374d0f26feb6b493477381529600ce9df1114595321cd5451401dd9b"
+  },
+  "total_inflows_rmb": "9859052.34",
+  "total_payments_rmb": "22811577.80"
+}
