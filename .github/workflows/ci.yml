@@ -45,6 +45,12 @@ jobs:
             --dataset module3/fixtures/fixed_demo \
             --strategy all --out ci_outputs
 
+      - name: Every pilot scenario x strategy
+        if: matrix.python-version == '3.12'
+        run: |
+          python module3/scenario_report.py \
+            --root module3/fixtures/pilot --markdown >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publish summary
         if: always()
         run: |
