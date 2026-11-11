@@ -27,6 +27,9 @@ python module3/run_engine.py --dataset module3/fixtures/fixed_demo --strategy al
 # Coverage table across the seven scenarios (105 runs)
 python module3/scenario_report.py --root module3/fixtures/pilot --markdown
 
+# The 30-seed reporting set (1050 runs, about 35 s)
+python module3/scenario_report.py --root module3/fixtures/formal
+
 # One pilot dataset, written to disk
 python module3/run_engine.py \
   --dataset module3/fixtures/pilot/baseline/seed_1001 \
@@ -64,9 +67,10 @@ module3/
 │   ├── engine.py            event queue, cash state machine, S0/S1
 │   └── adapters.py          Module 4/5 seams and integration fallbacks
 ├── fixtures/
-│   ├── PROVENANCE.md        origin and integrity notes for both bundles
+│   ├── PROVENANCE.md        origin and integrity notes for the three bundles
 │   ├── fixed_demo/          10 payments, 3 inflows (hand-checkable)
-│   └── pilot/               7 scenarios x 3 seeds = 21 datasets
+│   ├── pilot/               7 scenarios x 3 seeds  =  21 datasets (debugging)
+│   └── formal/              7 scenarios x 30 seeds = 210 datasets (reporting)
 └── tests/test_module3.py    acceptance tests
 ```
 
@@ -192,7 +196,7 @@ decide_funding(queue, state, known_inflows, config, mode)
 | Is `I000001` spendable before 450 s? | No |
 | RMB / HKD conservation | exact to the cent, all seven pilot scenarios × five strategies |
 | 21 pilot datasets × 5 strategies | 105 runs, executed in CI on every push |
-| 210 formal datasets × 5 strategies | 1050 runs, 0 failures, about 30 s (run locally) |
+| 210 formal datasets × 5 strategies | 1050 runs, 0 failures, about 30 s (on demand, not on every push) |
 
 ---
 

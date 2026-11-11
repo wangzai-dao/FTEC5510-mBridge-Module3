@@ -38,9 +38,30 @@ The seven scenarios are `baseline`, `low_rmb_liquidity`, `payment_surge`,
 Every one of them is executed in CI, for all five strategies, so liquidity
 constraints, arrival surges and FX shortages are all exercised on every push.
 
-The formal set (210 datasets, seeds 20001-20030) is deliberately **not** bundled:
-it is roughly 1.4 MB, it changes whenever Module 2 regenerates, and it belongs to
-the reporting stage rather than to continuous integration.
+## `formal/` - the 30-seed reporting set
+
+| Item | Value |
+|---|---|
+| Source repository | same |
+| Path inside that repo | `outputs/formal/<scenario>/seed_<n>/` |
+| Files kept | `config.json`, `payments.csv`, `inflows.csv`, `manifest.json` |
+| Datasets | 210 = 7 scenarios x 30 formal seeds (20001-20030) |
+| Total size | about 2 MB |
+
+These are the seeds behind every number reported in the final report; the pilot
+seeds must never be used for that, or the parameters would be tuned on the same
+data they are evaluated on.
+
+CI does **not** execute the formal set on every push - that would add roughly
+35 s per job for no correctness benefit. Run it explicitly when producing results:
+
+```bash
+python module3/scenario_report.py --root module3/fixtures/formal
+```
+
+The formal bundle is the only bulky part of this directory. If repository size
+ever becomes a problem, it is the first thing to move to an external archive;
+`upload_to_github.py` skips unchanged files, so re-adding it later is cheap.
 
 ## Why bundle data at all
 
