@@ -1,0 +1,20 @@
+{
+  "advance_notice_inflows": 13,
+  "dataset_id": "formal_tight_deadlines_seed_20019",
+  "inflows": 24,
+  "inflows_after_observation_window": 0,
+  "note": "Generated synthetic external events. Never treat these as settled payments or simulated strategy results.",
+  "payments": 120,
+  "phase": "formal",
+  "scenario_id": "tight_deadlines",
+  "schema_version": "1.0.0",
+  "seed": 20019,
+  "sha256": {
+    "config.json": "0c9a99b5f4b47c9ea2dd9d44d6fe3ef2f6140d853379a82e9d0b274a7d387927",
+    "expected_exogenous_events.csv": "d97b36b28c59a35d82d316a80bb29f09febbee71a0fc1c743d07fd8c2c61a77e",
+    "inflows.csv": "8052d2818fcb1848baba3b1d1d7ac260b56f2416659d6086913f507a26fa2c04",
+    "payments.csv": "5efb76d4a4c6f1ec803f08f3700937478fade5ff2ab4aab2b23126ce0a1ee8f7"
+  },
+  "total_inflows_rmb": "9756073.72",
+  "total_payments_rmb": "24955920.23"
+}

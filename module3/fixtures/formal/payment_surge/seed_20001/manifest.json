@@ -1,0 +1,20 @@
+{
+  "advance_notice_inflows": 15,
+  "dataset_id": "formal_payment_surge_seed_20001",
+  "inflows": 24,
+  "inflows_after_observation_window": 0,
+  "note": "Generated synthetic external events. Never treat these as settled payments or simulated strategy results.",
+  "payments": 240,
+  "phase": "formal",
+  "scenario_id": "payment_surge",
+  "schema_version": "1.0.0",
+  "seed": 20001,
+  "sha256": {
+    "config.json": "2275dd021274b6a71b708505d1f1a33f5de3517c8f23601c7d83f60531cc46c1",
+    "expected_exogenous_events.csv": "b45c5806684fbc5e192b797a4739062c4141fa431a8eeb4f4fd0fbbd8a981128",
+    "inflows.csv": "49d9a8f160d07e73031e4c63db98b8256b69194f0e73d8bb70ec9037d73adf01",
+    "payments.csv": "239689fdfc0800802eced5125ad6e2370444a893394df06b10d1ec5ffe9dd23b"
+  },
+  "total_inflows_rmb": "10729406.24",
+  "total_payments_rmb": "50017787.55"
+}
