@@ -1,0 +1,20 @@
+{
+  "advance_notice_inflows": 14,
+  "dataset_id": "formal_large_payments_seed_20006",
+  "inflows": 24,
+  "inflows_after_observation_window": 0,
+  "note": "Generated synthetic external events. Never treat these as settled payments or simulated strategy results.",
+  "payments": 120,
+  "phase": "formal",
+  "scenario_id": "large_payments",
+  "schema_version": "1.0.0",
+  "seed": 20006,
+  "sha256": {
+    "config.json": "864f04310f0ec1c2178133dbeeb6c07d473a609d75a2e2ebe39e8fe752c01863",
+    "expected_exogenous_events.csv": "0d17d3d17b5eb6d23e1838b98d1dfea6d56a84fd90a11fed41c58b692832c748",
+    "inflows.csv": "9cbb118384202effbf730df79beaa326d3ac3b850622a913de6b58538cb03aac",
+    "payments.csv": "70acda7cb66e7d89e6b841bafc58f10f19e4296976b0ca9727e437fc3e1e393f"
+  },
+  "total_inflows_rmb": "10124116.46",
+  "total_payments_rmb": "67392529.99"
+}

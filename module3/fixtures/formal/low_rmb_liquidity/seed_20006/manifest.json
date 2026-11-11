@@ -1,0 +1,20 @@
+{
+  "advance_notice_inflows": 14,
+  "dataset_id": "formal_low_rmb_liquidity_seed_20006",
+  "inflows": 24,
+  "inflows_after_observation_window": 0,
+  "note": "Generated synthetic external events. Never treat these as settled payments or simulated strategy results.",
+  "payments": 120,
+  "phase": "formal",
+  "scenario_id": "low_rmb_liquidity",
+  "schema_version": "1.0.0",
+  "seed": 20006,
+  "sha256": {
+    "config.json": "a0b64f514e4f9e972cfaba1af49a572d59a4e2c710379f6e67decff7927d1d7a",
+    "expected_exogenous_events.csv": "1d6ca1d7e146eb4da9db78b352214922b770addd85a7554929421ab39afa4b9d",
+    "inflows.csv": "9cbb118384202effbf730df79beaa326d3ac3b850622a913de6b58538cb03aac",
+    "payments.csv": "8cf41791594fd3a7e6fe95834cc4edc3ca22f78c524055a4fc63d9edad9eb2b3"
+  },
+  "total_inflows_rmb": "10124116.46",
+  "total_payments_rmb": "24770333.08"
+}
