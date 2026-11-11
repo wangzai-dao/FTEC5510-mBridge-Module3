@@ -48,14 +48,17 @@ jobs:
       - name: Every pilot scenario x strategy
         if: matrix.python-version == '3.12'
         run: |
+          set -o pipefail
           python module3/scenario_report.py \
-            --root module3/fixtures/pilot --markdown >> "$GITHUB_STEP_SUMMARY"
+            --root module3/fixtures/pilot --markdown | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Publish summary
         if: always()
         run: |
           {
-            echo "### Module 3 self-check - Python ${{ matrix.python-version }}"
+            echo "### Fixture self-check — 10-payment fixed_demo, Python ${{ matrix.python-version }}"
+            echo ""
+            echo "Correctness fixture only: it has no liquidity pressure, so 0 FX is expected and these are **not** the pilot results."
             echo ""
             echo '```'
             python module3/run_engine.py \
